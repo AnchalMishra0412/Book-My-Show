@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         SCANNER_HOME = tool 'sonarqube-scanner'
-        DOCKER_IMAGE = 'anchalmishra04/bookmyshow:1.0'
+        DOCKER_IMAGE = "anchalmishra04/bookmyshow:${BUILD_NUMBER}"
         EKS_CLUSTER_NAME = 'bookmyshow-eks'
         AWS_REGION = 'us-east-1'
     }
@@ -32,7 +32,7 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonarserver') {
                     sh '''
-                    $SCANNER_HOME/bin/sonar-scanner \
+                        $SCANNER_HOME/bin/sonar-scanner \
                         -Dsonar.projectKey=BMS \
                         -Dsonar.projectName=BMS \
                         -Dsonar.sources=.
@@ -44,7 +44,7 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonarid'
+                    waitForQualityGate abortPipeline: true, credentialsId: 'sonarid'
                 }
             }
         }
@@ -75,9 +75,12 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'docker-creds', toolName: 'docker') {
+                    withDockerRegistry(credentialsId: 'docker-creds') {
                         sh '''
+                        echo "Building Docker Image"
                         docker build --no-cache -t $DOCKER_IMAGE -f bookmyshow-app/Dockerfile bookmyshow-app
+
+                        echo "Pushing Docker Image"
                         docker push $DOCKER_IMAGE
                         '''
                     }
@@ -90,8 +93,10 @@ pipeline {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     sh '''
                     aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+
                     kubectl apply -f deployment.yml
                     kubectl apply -f service.yml
+
                     kubectl get pods
                     kubectl get svc
                     '''
@@ -110,3 +115,4 @@ pipeline {
         }
     }
 }
+
