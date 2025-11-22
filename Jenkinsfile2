@@ -3,7 +3,7 @@ pipeline {
 
     tools {
         jdk 'jdk17'
-        nodejs 'nodejs25'
+        nodejs 'nodejs20'
     }
 
     environment {
@@ -31,10 +31,10 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarserver') {
-                    sh ''' 
+                    sh '''
                     $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectName=BMS \
                         -Dsonar.projectKey=BMS \
+                        -Dsonar.projectName=BMS \
                         -Dsonar.sources=.
                     '''
                 }
@@ -53,13 +53,8 @@ pipeline {
             steps {
                 sh '''
                 cd bookmyshow-app
-                if [ -f package.json ]; then
-                    rm -rf node_modules package-lock.json
-                    npm install
-                else
-                    echo "package.json not found!"
-                    exit 1
-                fi
+                rm -rf node_modules package-lock.json
+                npm install
                 '''
             }
         }
@@ -80,12 +75,9 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'docker-creds', url: 'https://index.docker.io/v1/') {
+                    withDockerRegistry(credentialsId: 'docker-creds', toolName: 'docker') {
                         sh '''
-                        echo "Building Docker image..."
                         docker build --no-cache -t $DOCKER_IMAGE -f bookmyshow-app/Dockerfile bookmyshow-app
-
-                        echo "Pushing Docker image to Docker Hub..."
                         docker push $DOCKER_IMAGE
                         '''
                     }
@@ -95,7 +87,7 @@ pipeline {
 
         stage('Deploy to EKS Cluster') {
             steps {
-                script {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     sh '''
                     aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
                     kubectl apply -f deployment.yml
@@ -111,12 +103,11 @@ pipeline {
     post {
         always {
             emailext attachLog: true,
-                subject: "'${currentBuild.result}'",
-                body: "Project: ${env.JOB_NAME}<br/>" +
-                      "Build Number: ${env.BUILD_NUMBER}<br/>" +
-                      "URL: ${env.BUILD_URL}<br/>",
-                to: '04anchalmishra@gmail.com',
-                attachmentsPattern: 'trivyfs.txt'
+            subject: "'${currentBuild.result}'",
+            body: "Project: ${env.JOB_NAME}<br/>Build Number: ${env.BUILD_NUMBER}<br/>URL: ${env.BUILD_URL}<br/>",
+            to: '04anchalmishra@gmail.com',
+            attachmentsPattern: 'trivyfs.txt'
         }
     }
 }
+
