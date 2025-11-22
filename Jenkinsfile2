@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         SCANNER_HOME = tool 'sonarqube-scanner'
-        DOCKER_IMAGE = 'anchalmishra04/bookmyshow'
+        DOCKER_IMAGE = 'anchalmishra04/bookmyshow:1.0'
         EKS_CLUSTER_NAME = 'bookmyshow-eks'
         AWS_REGION = 'us-east-1'
     }
